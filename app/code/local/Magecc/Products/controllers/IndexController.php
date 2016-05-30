@@ -1,67 +1,32 @@
 <?php
-/**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magento.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magento.com for more information.
- *
- * @category    Mage
- * @package     Mage_Catalog
- * @copyright  Copyright (c) 2006-2016 X.commerce, Inc. and affiliates (http://www.magento.com)
- * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-
-class Mage_Catalog_Block_Product extends Mage_Core_Block_Template
+class Magecc_Products_IndexController extends Mage_Core_Controller_Front_Action
 {
-    protected $_finalPrice = array();
-
-    public function getProduct()
-    {
-        if (!$this->getData('product') instanceof Mage_Catalog_Model_Product) {
-            if ($this->getData('product')->getProductId()) {
-                $productId = $this->getData('product')->getProductId();
-            }
-            if ($productId) {
-                $product = Mage::getModel('catalog/product')->load($productId);
-                if ($product) {
-                    $this->setProduct($product);
-                }
+    /*
+     * Display products information in Json format 
+     * (Name, Description, Price, image urls array)
+     * 
+     */
+    public function indexAction()
+    {			
+        $_collection = Mage::getModel('catalog/product')->getCollection();
+        $_collection->addAttributeToFilter('status', array('eq' => 1));
+        $_collection->addAttributeToFilter('visibility', array('eq' => 4));
+        $_collection->setPageSize(30);
+        $config = array();
+        foreach($_collection as $product) {
+            $loadProduct = Mage::getModel('catalog/product')->load($product->getEntityId());
+            $mediaImages = $loadProduct->getMediaGalleryImages();
+            $config[$product->getId()]['name'] = $loadProduct->getName();
+            $config[$product->getId()]['description'] = $loadProduct->getDescription();
+            $config[$product->getId()]['price'] = Mage::helper('core')->formatPrice($loadProduct->getPrice(), false);
+            if($mediaImages){
+                $i=0;
+                foreach($mediaImages as $_image){
+                    $config[$product->getId()]['images'][] = $_image->getUrl();
+                }  
             }
         }
-        return $this->getData('product');
-    }
-
-    public function getPrice()
-    {
-        return $this->getProduct()->getPrice();
-    }
-
-    public function getFinalPrice()
-    {
-        if (!isset($this->_finalPrice[$this->getProduct()->getId()])) {
-            $this->_finalPrice[$this->getProduct()->getId()] = $this->getProduct()->getFinalPrice();
-        }
-        return $this->_finalPrice[$this->getProduct()->getId()];
-    }
-
-    public function getPriceHtml($product)
-    {
-        $this->setTemplate('catalog/product/price.phtml');
-        $this->setProduct($product);
-        return $this->toHtml();
+        $this->getResponse()->clearHeaders()->setHeader('Content-type','application/json',true);
+        $this->getResponse()->setBody(json_encode($config));
     }
 }
